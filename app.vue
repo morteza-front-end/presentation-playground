@@ -6,12 +6,12 @@
         <span class="brand-mark">{ }</span>
         <div>
           <h1>TS Presentation Playground</h1>
-          <p class="sub">Live-debugging TypeScript · Monaco diagnostics in the browser</p>
+          <p class="sub">Live-editable TypeScript snippets · Monaco diagnostics in the browser</p>
         </div>
       </div>
       <div class="topbar-stats">
-        <span class="chip chip-blue">{{ list.length }} sections</span>
-        <span class="chip" :class="diagClass">{{ errorCount }} errors</span>
+        <span class="chip chip-blue">{{ sections.length }} sections</span>
+        <span class="chip">{{ totalSnippets }} snippets</span>
         <span class="chip chip-green">strict: true</span>
       </div>
     </header>
@@ -19,187 +19,100 @@
     <div class="workspace">
       <!-- ─────────────────────────── SIDEBAR ─────────────────────────── -->
       <aside class="sidebar">
-        <div class="sidebar-head">Sections</div>
+        <div class="sidebar-head">Contents</div>
         <nav>
-          <button
-            v-for="s in list"
+          <a
+            v-for="s in sections"
             :key="s.id"
             class="nav-item"
-            :class="{ active: s.id === active?.id }"
-            @click="select(s)"
+            :class="{ active: s.id === activeId }"
+            :href="`#${s.id}`"
+            @click.prevent="scrollTo(s.id)"
           >
             <span class="nav-num">{{ String(s.section).padStart(2, '0') }}</span>
             <span class="nav-text">
               <span class="nav-title">{{ s.title }}</span>
-              <span class="nav-sub">{{ s.subtitle }}</span>
+              <span class="nav-sub">{{ s.snippets.length }} snippets</span>
             </span>
-          </button>
+          </a>
         </nav>
         <div class="sidebar-foot">
-          <code>npm run demo:tools</code>
-          <span class="dim">runs the sample via tsx in your terminal</span>
+          <span class="dim">Edit any code box · red squiggles update live, like VS Code.</span>
         </div>
       </aside>
 
-      <!-- ─────────────────────────── RIGHT COLUMN ─────────────────────────── -->
-      <section class="right">
-        <!-- TOP RIGHT: Monaco editor -->
-        <div class="editor-pane">
-          <div class="pane-head">
-            <div class="tabs">
-              <span class="file-tab">
-                <span class="dot lang-ts">TS</span>
-                {{ active?.file ?? '' }}
-              </span>
-            </div>
-            <div class="diag-strip" v-if="active">
-              <span class="diag-pill" :class="diagClass">{{ errorCount }}</span>
-              <span class="diag-label">{{ errorCount === 1 ? 'diagnostic' : 'diagnostics' }}</span>
-            </div>
-          </div>
-
-          <ClientOnly>
-            <div ref="editorEl" class="editor-host"></div>
-            <template #fallback>
-              <div class="editor-fallback">Loading Monaco editor…</div>
-            </template>
-          </ClientOnly>
-        </div>
-
-        <!-- BOTTOM RIGHT: tabbed panel -->
-        <div class="bottom-pane">
-          <div class="pane-head pane-head-tabs">
-            <div class="tabs">
-              <button
-                class="tab"
-                :class="{ on: bottomTab === 'cheat' }"
-                @click="bottomTab = 'cheat'"
-              >
-                Cheat Sheet &amp; Deep Explanations
-              </button>
-              <button
-                class="tab"
-                :class="{ on: bottomTab === 'console' }"
-                @click="bottomTab = 'console'"
-              >
-                Mock Console / Runtime
-              </button>
-            </div>
-          </div>
-
-          <div class="bottom-body">
-            <!-- TAB 1: cheat sheet -->
-            <div v-if="bottomTab === 'cheat' && active" class="markdown" v-html="cheatHtml"></div>
-
-            <!-- TAB 2: console -->
-            <div v-if="bottomTab === 'console' && active" class="console">
-              <div class="console-bar">
-                <span class="prompt">$</span>
-                <code>tsx {{ active.file }}</code>
+      <!-- ─────────────────────────── CONTENT ─────────────────────────── -->
+      <main ref="contentEl" class="content" @scroll="onScroll">
+        <div class="content-inner">
+          <section
+            v-for="s in sections"
+            :id="s.id"
+            :key="s.id"
+            :ref="(el) => setSectionRef(s.id, el)"
+            class="doc-section"
+          >
+            <div class="sec-head">
+              <span class="sec-num">{{ String(s.section).padStart(2, '0') }}</span>
+              <div>
+                <h2 class="sec-title">{{ s.title }}</h2>
+                <p class="sec-sub">{{ s.subtitle }}</p>
               </div>
-              <pre class="console-out">{{ active.consoleOutput }}</pre>
             </div>
-          </div>
+            <div class="markdown sec-intro" v-html="introHtml(s.intro)"></div>
+
+            <InlinePlayground
+              v-for="sn in s.snippets"
+              :key="sn.id"
+              :snippet="sn"
+            />
+          </section>
+          <div class="content-end">— end —</div>
         </div>
-      </section>
+      </main>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import type * as Monaco from 'monaco-editor';
-import { useSamples } from '~/composables/useSamples';
-import { setupMonaco } from '~/composables/useMonaco';
+import { computed, onBeforeUnmount, onMounted, ref, type ComponentPublicInstance } from 'vue';
+import { sections } from '~/samples/index';
 import { renderMarkdown } from '~/utils/markdown';
-import type { SampleEntry } from '~/samples/index';
 
-const { list, loadCode } = useSamples();
+const totalSnippets = computed(() => sections.reduce((a, s) => a + s.snippets.length, 0));
 
-const active = ref<SampleEntry>(list[0]!);
-const bottomTab = ref<'cheat' | 'console'>('cheat');
-const errorCount = ref(0);
+const activeId = ref(sections[0]!.id);
+const contentEl = ref<HTMLElement | null>(null);
+const sectionRefs = new Map<string, HTMLElement>();
 
-const editorEl = ref<HTMLElement | null>(null);
-let editor: Monaco.editor.IStandaloneCodeEditor | null = null;
-let monacoLib: typeof Monaco | null = null;
-let model: Monaco.editor.ITextModel | null = null;
-let diagSub: Monaco.IDisposable | null = null;
-
-const cheatHtml = computed(() => renderMarkdown(active.value.cheatSheet));
-
-const diagClass = computed(() => (errorCount.value === 0 ? 'chip-green' : 'chip-red'));
-
-async function select(s: SampleEntry) {
-  if (s.id === active.value.id) return;
-  active.value = s;
-  bottomTab.value = 'cheat';
-  await hydrateModel();
+function setSectionRef(id: string, el: Element | ComponentPublicInstance | null) {
+  if (el instanceof HTMLElement) sectionRefs.set(id, el);
+  else sectionRefs.delete(id);
 }
 
-async function hydrateModel() {
-  if (!monacoLib || !editor) return;
-  let code = '';
-  try {
-    code = await loadCode(active.value);
-  } catch {
-    code = `// Could not fetch ${active.value.file} from the dev server.\n// Make sure the samples/ folder is served statically.`;
+function introHtml(md: string) {
+  // strip the leading "# NN · Title" heading — it duplicates the section head.
+  const stripped = md.replace(/^#\s+.*\n+/, '');
+  return renderMarkdown(stripped);
+}
+
+function scrollTo(id: string) {
+  const el = sectionRefs.get(id);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function onScroll() {
+  if (!contentEl.value) return;
+  const top = contentEl.value.scrollTop;
+  let current = sections[0]!.id;
+  for (const s of sections) {
+    const el = sectionRefs.get(s.id);
+    if (el && el.offsetTop - 80 <= top) current = s.id;
   }
-
-  const uri = monacoLib.Uri.parse(`file:///${active.value.file}`);
-  model =
-    monacoLib.editor.getModel(uri) ??
-    monacoLib.editor.createModel(code, 'typescript', uri);
-
-  if (model.getValue() !== code) model.setValue(code);
-  editor.setModel(model);
-
-  // recompute diagnostics immediately
-  countDiagnostics();
+  activeId.value = current;
 }
 
-function countDiagnostics() {
-  if (!monacoLib || !model) {
-    errorCount.value = 0;
-    return;
-  }
-  const markers = monacoLib.editor.getModelMarkers({
-    resource: model.uri,
-  });
-  errorCount.value = markers.filter((m) => m.severity >= monacoLib!.MarkerSeverity.Warning).length;
-}
-
-onMounted(async () => {
-  monacoLib = await setupMonaco();
-  if (!editorEl.value) return;
-
-  editor = monacoLib.editor.create(editorEl.value, {
-    theme: 'vs-dark',
-    language: 'typescript',
-    automaticLayout: true,
-    fontSize: 13.5,
-    fontFamily: "'JetBrains Mono','Fira Code',Consolas,monospace",
-    fontLigatures: true,
-    minimap: { enabled: false },
-    scrollBeyondLastLine: false,
-    renderLineHighlight: 'all',
-    smoothScrolling: true,
-    tabSize: 2,
-    lineNumbersMinChars: 3,
-    fixedOverflowWidgets: true,
-  });
-
-  // React to live diagnostics as the TS worker recomputes them.
-  diagSub = monacoLib.editor.onDidChangeMarkers(() => countDiagnostics());
-
-  await hydrateModel();
-});
-
-onBeforeUnmount(() => {
-  diagSub?.dispose();
-  model?.dispose();
-  editor?.dispose();
-});
+onMounted(() => onScroll());
+onBeforeUnmount(() => sectionRefs.clear());
 </script>
 
 <style scoped>
@@ -210,7 +123,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
-/* ── header ── */
+/* header */
 .topbar {
   display: flex;
   align-items: center;
@@ -268,21 +181,16 @@ onBeforeUnmount(() => {
   color: var(--success);
   border-color: #1e5b2c;
 }
-.chip-red {
-  color: var(--danger);
-  border-color: #6e2e2e;
-  background: #2a1414;
-}
 
-/* ── workspace ── */
+/* workspace */
 .workspace {
   display: grid;
-  grid-template-columns: 290px 1fr;
+  grid-template-columns: 270px 1fr;
   flex: 1;
   min-height: 0;
 }
 
-/* ── sidebar ── */
+/* sidebar */
 .sidebar {
   background: var(--bg-elev);
   border-right: 1px solid var(--border);
@@ -313,6 +221,9 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   transition: background 0.12s;
   margin-bottom: 2px;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--text);
 }
 .nav-item:hover {
   background: var(--bg-elev2);
@@ -336,13 +247,12 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 .nav-title {
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
 }
 .nav-sub {
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--text-dim);
-  line-height: 1.3;
 }
 .sidebar-foot {
   padding: 12px 14px;
@@ -350,164 +260,58 @@ onBeforeUnmount(() => {
   font-size: 11px;
   color: var(--text-dim);
 }
-.sidebar-foot code {
-  font-family: var(--mono);
-  color: var(--accent);
-  display: block;
-  margin-bottom: 4px;
-}
 .sidebar-foot .dim {
-  opacity: 0.7;
+  opacity: 0.8;
+  line-height: 1.5;
 }
 
-/* ── right column ── */
-.right {
-  display: grid;
-  grid-template-rows: minmax(0, 1.35fr) minmax(0, 1fr);
-  min-height: 0;
-}
-
-/* ── editor pane ── */
-.editor-pane {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  border-bottom: 1px solid var(--border);
-}
-.pane-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 12px;
-  background: var(--bg-elev);
-  border-bottom: 1px solid var(--border);
-  min-height: 36px;
-}
-.pane-head-tabs {
-  padding: 0;
-}
-.tabs {
-  display: flex;
-  gap: 2px;
-  align-items: center;
-}
-.file-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--text-dim);
-}
-.dot {
-  width: 22px;
-  height: 16px;
-  border-radius: 4px;
-  display: inline-grid;
-  place-items: center;
-  font-size: 9px;
-  font-weight: 700;
-}
-.lang-ts {
-  background: #3178c6;
-  color: #fff;
-}
-.diag-strip {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11.5px;
-}
-.diag-pill {
-  font-family: var(--mono);
-  font-weight: 700;
-  font-size: 12px;
-  min-width: 22px;
-  height: 20px;
-  padding: 0 6px;
-  display: inline-grid;
-  place-items: center;
-  border-radius: 5px;
-}
-.chip-red .diag-pill,
-.diag-pill.chip-red {
-  background: #6e2e2e;
-  color: var(--danger);
-}
-.diag-pill.chip-green {
-  background: #1e5b2c;
-  color: var(--success);
-}
-.diag-label {
-  color: var(--text-dim);
-}
-.editor-host {
-  flex: 1;
-  min-height: 0;
-}
-.editor-fallback {
-  flex: 1;
-  display: grid;
-  place-items: center;
-  color: var(--text-dim);
-  font-family: var(--mono);
-}
-
-/* ── bottom pane ── */
-.bottom-pane {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.tab {
-  padding: 8px 14px;
-  font-size: 12.5px;
-  color: var(--text-dim);
-  border-bottom: 2px solid transparent;
-  height: 36px;
-}
-.tab:hover {
-  color: var(--text);
-}
-.tab.on {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-}
-.bottom-body {
-  flex: 1;
+/* content */
+.content {
   overflow-y: auto;
-  padding: 16px 20px;
-  background: var(--bg);
+  scroll-behavior: smooth;
 }
-.console {
-  font-family: var(--mono);
-  font-size: 12.5px;
+.content-inner {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 28px 36px 80px;
 }
-.console-bar {
+.doc-section {
+  padding-top: 14px;
+  scroll-margin-top: 16px;
+}
+.sec-head {
   display: flex;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
-  border-radius: 6px 6px 0 0;
-  border-bottom: none;
+  gap: 14px;
   align-items: center;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 14px;
 }
-.console-bar .prompt {
-  color: var(--success);
+.sec-num {
+  font-family: var(--mono);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--accent-dim);
+  opacity: 0.6;
+}
+.sec-title {
+  font-size: 19px;
   font-weight: 700;
 }
-.console-bar code {
-  color: var(--accent);
+.sec-sub {
+  font-size: 12.5px;
+  color: var(--text-dim);
 }
-.console-out {
-  background: #05080c;
-  border: 1px solid var(--border);
-  border-radius: 0 0 6px 6px;
-  padding: 12px 14px;
-  color: #b9e3ff;
-  white-space: pre-wrap;
-  line-height: 1.6;
-  font-family: var(--mono);
+.sec-intro {
+  font-size: 13.5px;
+  line-height: 1.65;
+  margin-bottom: 8px;
+}
+.content-end {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 12px;
+  margin-top: 40px;
+  opacity: 0.5;
 }
 </style>

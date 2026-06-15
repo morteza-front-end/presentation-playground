@@ -1,14 +1,18 @@
 // scripts/check-samples.ts
-// Terminal helper: prints the sample registry as a table.
-// Run with:  pnpm check:samples  (or: tsx scripts/check-samples.ts)
-import { samples } from '../samples/index.ts';
+// Terminal helper: prints the registry (sections + snippets) as a table.
+// Run with:  npm run check:samples  (or: tsx scripts/check-samples.ts)
+import { sections } from '../samples/index.ts';
 
-console.log('\n  TypeScript Presentation Playground — samples registry\n');
-console.log('  # │ file                                              │ bugs (// BUG)');
-console.log('  ──┼───────────────────────────────────────────────────┼──────────────');
-for (const s of samples) {
-  const f = s.file.padEnd(49);
-  const b = `${s.section}`.padStart(2);
-  console.log(`  ${b} │ ${f} │ ${s.title}`);
+console.log('\n  TypeScript Presentation Playground — registry\n');
+console.log('  # │ snippet id                                  │ title');
+console.log('  ──┼─────────────────────────────────────────────┼─────────────────────────────');
+let total = 0;
+for (const sec of sections) {
+  for (const sn of sec.snippets) {
+    const id = sn.id.padEnd(43);
+    const num = `${sec.section}`.padStart(2);
+    console.log(`  ${num} │ ${id} │ ${sn.title}`);
+    total++;
+  }
 }
-console.log(`\n  ${samples.length} sections registered.\n`);
+console.log(`\n  ${sections.length} sections · ${total} snippets registered.\n`);
