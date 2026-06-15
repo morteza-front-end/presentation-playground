@@ -1,0 +1,129 @@
+/* assets/css/main.css */
+:root {
+  --bg: #0d1117;
+  --bg-elev: #161b22;
+  --bg-elev2: #1f2630;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-dim: #8b949e;
+  --accent: #58a6ff;
+  --accent-dim: #1f6feb;
+  --danger: #f85149;
+  --success: #3fb950;
+  --warning: #d29922;
+  --mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+  --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#__nuxt {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #484f58;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+}
+
+.markdown {
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+.markdown h1 {
+  font-size: 18px;
+  margin: 0 0 12px;
+  color: var(--accent);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+.markdown h2 {
+  font-size: 15px;
+  margin: 18px 0 8px;
+  color: var(--text);
+}
+.markdown h3 {
+  font-size: 13.5px;
+  margin: 14px 0 6px;
+  color: var(--accent);
+}
+.markdown p {
+  margin: 8px 0;
+}
+.markdown code {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  background: var(--bg-elev2);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: #ffb86c;
+}
+.markdown pre {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+.markdown pre code {
+  background: none;
+  padding: 0;
+  color: var(--text);
+}
+.markdown table {
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 12.5px;
+}
+.markdown th,
+.markdown td {
+  border: 1px solid var(--border);
+  padding: 5px 9px;
+  text-align: left;
+}
+.markdown th {
+  background: var(--bg-elev2);
+}
+.markdown ul,
+.markdown ol {
+  margin: 8px 0 8px 20px;
+}
+.markdown li {
+  margin: 3px 0;
+}
+.markdown hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 14px 0;
+}
