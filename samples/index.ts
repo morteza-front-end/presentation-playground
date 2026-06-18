@@ -10,6 +10,11 @@
 // Section ordering follows the "Total TypeScript — TypeScript
 // Pro Essentials" course video list (videos 001–194). Each
 // section header notes the video range it maps to.
+//
+// IMPORTANT: the Monaco TS worker compiles every snippet model in
+// ONE program. Each snippet therefore ends with `export {};` so it
+// is treated as a MODULE — module-scoped top-level declarations never
+// collide across snippets (no spurious "Duplicate identifier" errors).
 // ============================================================
 
 export interface Snippet {
@@ -65,7 +70,9 @@ running program.`,
 
 // At runtime this is plain JS — "Product" and the annotations are gone.
 const mouse: Product = { id: 1, name: 'Mouse' };
-console.log(mouse);`,
+console.log(mouse);
+
+export {};`,
         consoleOutput: `{ id: 1, name: 'Mouse' }
 
 // Emitted JS:   const mouse = { id: 1, name: "Mouse" };
@@ -83,7 +90,9 @@ Mismatch them and you get "type exists but the runtime method does not".`,
         code: `// \`??\` needs target >= ES2020 to emit verbatim. Below that it becomes
 // a ternary + __helper. The TYPE is unaffected by target.
 const maybe: number | null = null;
-const value = maybe ?? 42;`,
+const value = maybe ?? 42;
+
+export {};`,
         consoleOutput: `// target: ES2022  =>  emitted verbatim:  const value = maybe ?? 42;
 // target: ES5      =>  down-leveled into a ternary helper.`,
       },
@@ -120,7 +129,9 @@ const price: Number = 49.99;
 const inStock: Boolean = true;
 
 // Lowercase "string" is the primitive — the correct choice.
-const ok: string = 'Wireless Mouse';`,
+const ok: string = 'Wireless Mouse';
+
+export {};`,
         consoleOutput: `// typeof productName => "string"  (primitive, despite the String type)
 // The type annotation lied — runtime value is still a primitive.
 // Rule of thumb: never annotate with Number / Boolean / Symbol / String.`,
@@ -139,7 +150,9 @@ function format(n) {
 // Correct: annotate it.
 function formatOk(n: number) {
   return n.toFixed(2);
-}`,
+}
+
+export {};`,
         consoleOutput: `[diagnostic] TS7006: Parameter 'n' implicitly has an 'any' type.`,
       },
       {
@@ -153,7 +166,9 @@ spec rule, not a TypeScript quirk.`,
   return \`Hello, \${name}\`;
 }
 
-console.log(greet.length); // 0, NOT 1 — default params are excluded.`,
+console.log(greet.length); // 0, NOT 1 — default params are excluded.
+
+export {};`,
         consoleOutput: `$ tsx ...
 0`,
       },
@@ -168,7 +183,9 @@ explicitly \`return\`. A branch that falls off the end implicitly returns
     return 'pass';
   }
   // Missing return on the else branch — flagged.
-}`,
+}
+
+export {};`,
         consoleOutput: `[diagnostic] TS7030: Not all code paths return a value.`,
       },
     ],
@@ -193,7 +210,9 @@ objects are typed with \`T[]\`. Tuples pin a fixed length and per-slot types. An
 independently typed. \`(string | number)[]\` is a variadic array of the union.
 \`pair[0]\` is \`string\`; swapping positions is an error.`,
         code: `let pair: [string, number] = ['id', 7];
-pair = [7, 'id']; // TS2322: position 0 must be string.`,
+pair = [7, 'id']; // TS2322: position 0 must be string.
+
+export {};`,
         consoleOutput: `[diagnostic] TS2322: Type '[number, string]' is not assignable to type '[string, number]'.`,
       },
       {
@@ -205,7 +224,9 @@ Prefer \`unknown\` at boundaries (parsed JSON, untrusted input) — it forces yo
 to **narrow** before use.`,
         code: `const payload: any = 42;
 // No error — but payload has no .timestamp. Runtime => undefined.
-const createdAt = payload.timestamp.iso; // 💥 runtime TypeError`,
+const createdAt = payload.timestamp.iso; // 💥 runtime TypeError
+
+export {};`,
         consoleOutput: `> TypeError: Cannot read properties of undefined (reading 'iso')
 ✖ process exited with code 1
 
@@ -234,7 +255,9 @@ deliberate special case so \`.map(x => x * 2)\` type-checks even though
 \`Array#map\`'s callback returns \`T\`. \`void\` does **not** mean "returns nothing".`,
         code: `const nums = [1, 2, 3];
 // Returns a number, but assignable to (n) => void. Intended.
-nums.forEach((n) => n * 2);`,
+nums.forEach((n) => n * 2);
+
+export {};`,
         consoleOutput: `// No error — a void-returning signature accepts any return type by design.`,
       },
       {
@@ -244,7 +267,9 @@ nums.forEach((n) => n * 2);`,
 assignable to a \`() => undefined\` signature, because \`void\` does not guarantee
 the value is actually \`undefined\`.`,
         code: `type Callback = () => undefined;
-const cb: Callback = () => {}; // TS2322 — void-ish return is not undefined.`,
+const cb: Callback = () => {}; // TS2322 — void-ish return is not undefined.
+
+export {};`,
         consoleOutput: `[diagnostic] TS2322: Type '() => void' is not assignable to type '() => undefined'.`,
       },
       {
@@ -256,7 +281,9 @@ object literals are distinct references → 2 entries.`,
         code: `const seen = new Set<{ id: number }>();
 seen.add({ id: 1 });
 seen.add({ id: 1 });
-console.log(seen.size); // 2, NOT 1 — reference equality.`,
+console.log(seen.size); // 2, NOT 1 — reference equality.
+
+export {};`,
         consoleOutput: `2`,
       },
       {
@@ -270,7 +297,9 @@ stock.set('mouse', 12);
 stock.set('keyboard', 'out'); // TS2345: 'out' is not a number.
 
 const qty = stock.get('mouse'); // number | undefined
-const doubled: number = qty * 2; // TS2532: possibly undefined.`,
+const doubled: number = qty * 2; // TS2532: possibly undefined.
+
+export {};`,
         consoleOutput: `[diagnostic] TS2345: Argument of type '"out"' is not assignable to parameter of type 'number'.
 [diagnostic] TS2532: Object is possibly 'undefined'.`,
       },
@@ -290,7 +319,9 @@ async function loadUser(id: number): Promise<User> {
 }
 
 // Caller gets a typed Promise<User>, not Promise<any>.
-loadUser(1).then((u) => u.name);`,
+loadUser(1).then((u) => u.name);
+
+export {};`,
         consoleOutput: `// loadUser(id) : Promise<User>   ← declared return type drives the inference.
 // Without it, .json() would silently produce any and u.name would be untyped.`,
       },
@@ -340,7 +371,9 @@ const obj: Record<string, number> & Record<typeof SECRET, number> = {
   a: 1,
   [SECRET]: 99,
 };
-console.log(Object.keys(obj)); // ['a'] — symbol key invisible.`,
+console.log(Object.keys(obj)); // ['a'] — symbol key invisible.
+
+export {};`,
         consoleOutput: `[ 'a' ]`,
       },
     ],
@@ -369,7 +402,9 @@ eliminates a huge class of \`Cannot read property of null\` runtime errors.`,
 let label: string = null; // TS2322
 
 // Correct: model absence explicitly.
-let labelOrMissing: string | null = null;`,
+let labelOrMissing: string | null = null;
+
+export {};`,
         consoleOutput: `[diagnostic] TS2322: Type 'null' is not assignable to type 'string'.`,
       },
       {
@@ -388,7 +423,9 @@ function retry(attempts = 3) {
   return attempts;
 }
 retry(undefined); // => 3 (fallback used)
-retry(null);      // TS2322: null is not assignable to number`,
+retry(null);      // TS2322: null is not assignable to number
+
+export {};`,
         consoleOutput: `retry(undefined) => 3   (fallback used)
 [diagnostic] TS2322: Type 'null' is not assignable to type 'number | undefined'.`,
       },
@@ -403,7 +440,9 @@ Use \`x !== null\` or \`x == null\` (covers both null and undefined).`,
     return x.length; // x is STILL null here — runtime throws.
   }
   return x;
-}`,
+}
+
+export {};`,
         consoleOutput: `[diagnostic] TS18047: 'x' is possibly 'null'.
 > TypeError: Cannot read properties of null (reading 'length')`,
       },
@@ -419,7 +458,9 @@ function first(i: Input): string {
   if (typeof i === 'string') return i;       // narrowed to string
   if ('query' in i) return i.query;          // narrowed to { query: string }
   return i[0] ?? '';                          // narrowed to string[]
-}`,
+}
+
+export {};`,
         consoleOutput: `// Each branch sees only the narrowed member of the Input union.`,
       },
     ],
@@ -449,7 +490,9 @@ Narrow with \`typeof\` / \`in\` / a type guard, or validate with a runtime decod
     return raw.id; // narrowed — now accessible.
   }
   return null;
-}`,
+}
+
+export {};`,
         consoleOutput: `[diagnostic] TS2571: Object is of type 'unknown'.  (before the guard)
 // After narrowing, raw.id is typed — safe to read.`,
       },
@@ -476,7 +519,9 @@ function describe(shape: Shape): string {
     default:
       return assertNever(shape); // errors if a new member is added & unhandled
   }
-}`,
+}
+
+export {};`,
         consoleOutput: `// Compiles clean while every member is handled. Add { kind: 'triangle' } and
 // the default branch stops being \`never\` — compile error. Brilliant.`,
       },
@@ -514,22 +559,47 @@ function areaOK(shape: Shape) {
     case 'rect':
       return shape.w * shape.h;
   }
-}`,
+}
+
+export {};`,
         consoleOutput: `// Clean — narrowing on shape.kind exposes the right fields per branch.`,
       },
       {
         id: '08-destructuring-trap',
-        title: 'The destructuring trap',
+        title: 'The destructuring trap — and the fix',
         explanation: `Narrowing works on the **original object**. The moment you do
 \`const { kind, radius } = shape\`, you have **severed the correlation**: checking
-\`kind\` no longer proves anything about \`radius\`'s presence. **Narrow first, read
-second** — never destructure a discriminated union across its members.`,
-        code: `function areaBAD(shape: Shape) {
-  const { kind, radius, size, w, h } = shape; // severs the link
-  if (kind === 'circle') return Math.PI * radius * radius; // radius: number | undefined
-  return 0;
-}`,
-        consoleOutput: `[diagnostic] TS2339: Property 'radius' does not exist on type 'Shape'.`,
+\`kind\` no longer proves anything about \`radius\`'s presence.
+
+**The fix:** narrow on the original object *first*, then destructure *inside* the
+narrowed branch — the correlation survives because you read \`shape\`, not the
+detached local.`,
+        code: `type Shape =
+  | { kind: 'circle'; radius: number }
+  | { kind: 'square'; size: number }
+  | { kind: 'rect'; w: number; h: number };
+
+// ❌ TRAP: destructuring across members severs the kind↔field link.
+// const { kind, radius } = shape;
+// if (kind === 'circle') return Math.PI * radius * radius; // TS2339: 'radius'
+
+// ✅ FIX: narrow on the original object, then destructure inside the branch.
+function area(shape: Shape) {
+  if (shape.kind === 'circle') {
+    const { radius } = shape; // shape narrowed to circle → radius: number
+    return Math.PI * radius * radius;
+  }
+  if (shape.kind === 'square') {
+    const { size } = shape;
+    return size * size;
+  }
+  const { w, h } = shape; // narrowed to rect
+  return w * h;
+}
+
+export {};`,
+        consoleOutput: `// Clean — narrow first (on shape), destructure second (inside the branch).
+// The broken version is shown commented out so you can see the TS2339 trap.`,
       },
     ],
   },
@@ -568,7 +638,9 @@ interface Animal {
 // Interface extends: explicit hierarchy, errors on conflicts.
 interface Dog extends Animal {
   bark(): void;
-}`,
+}
+
+export {};`,
         consoleOutput: `// User = { id: number; name: string }
 // Dog = { legs: number; bark(): void }`,
       },
@@ -587,7 +659,9 @@ const loud: Speaker = {
   say(text: string | number) {
     console.log(text);
   },
-};`,
+};
+
+export {};`,
         consoleOutput: `// No error: the method shorthand allows the wider string | number parameter.`,
       },
     ],
@@ -616,7 +690,9 @@ site. Assigning a variable of a wider shape to a narrower type is fine
 const raw = { x: 1, y: 2, z: 3 };
 const p1: Point = raw; // OK — no excess check on variables.
 
-const p2: Point = { x: 1, y: 2, z: 3 }; // TS2353: 'z' does not exist on Point.`,
+const p2: Point = { x: 1, y: 2, z: 3 }; // TS2353: 'z' does not exist on Point.
+
+export {};`,
         consoleOutput: `[diagnostic] TS2353: Object literal may only specify known properties, and 'z' does not exist in type 'Point'.`,
       },
       {
@@ -628,7 +704,9 @@ includes \`done\` only when assigned as a literal. (Distributive \`Omit\` over u
 is a separate trap — see below.)`,
         code: `type Todo = { id: number; title: string; done: boolean };
 type TodoPreview = Omit<Todo, 'done'>;
-const t: TodoPreview = { id: 1, title: 'x', done: false }; // TS2353: excess 'done'.`,
+const t: TodoPreview = { id: 1, title: 'x', done: false }; // TS2353: excess 'done'.
+
+export {};`,
         consoleOutput: `[diagnostic] TS2353: Object literal may only specify known properties, and 'done' does not exist in type 'TodoPreview'.`,
       },
       {
@@ -644,7 +722,9 @@ type TodoUpdate = Partial<Omit<Todo, 'id'>>;   // { title?; done? }
 
 function patch(id: number, data: TodoUpdate) {
   /* ... */
-}`,
+}
+
+export {};`,
         consoleOutput: `// TodoPreview = { id: number; title: string }
 // TodoUpdate  = { title?: string; done?: boolean }`,
       },
@@ -672,7 +752,9 @@ the value — two orthogonal axes.`,
 \`DeepReadonly<T>\`.`,
         code: `type Settings = Readonly<{ nested: { theme: string } }>;
 const s: Settings = { nested: { theme: 'dark' } };
-s.nested.theme = 'light'; // No error — shallow readonly does not protect depth.`,
+s.nested.theme = 'light'; // No error — shallow readonly does not protect depth.
+
+export {};`,
         consoleOutput: `// No diagnostic. s.nested is still a mutable { theme: string }.`,
       },
       {
@@ -689,7 +771,9 @@ string. \`satisfies\` is the modern way to check shape **without** freezing type
   shades: [50, 100, 200],
 } as const;
 palette.primary = '#fff'; // TS2540: readonly.
-const shade: number = palette.shades[0]; // type is literal 50, very narrow.`,
+const shade: number = palette.shades[0]; // type is literal 50, very narrow.
+
+export {};`,
         consoleOutput: `[diagnostic] TS2540: Cannot assign to 'primary' because it is a read-only property.`,
       },
       {
@@ -702,7 +786,9 @@ const shade: number = palette.shades[0]; // type is literal 50, very narrow.`,
 Two orthogonal axes. A \`const\` reference to a mutable object is still mutable
 in place.`,
         code: `const config = { retries: 3 };
-config.retries = 99; // legal — const only froze the binding, not the value.`,
+config.retries = 99; // legal — const only froze the binding, not the value.
+
+export {};`,
         consoleOutput: `// No diagnostic. config.retries is now 99.`,
       },
     ],
@@ -740,7 +826,9 @@ caller.`,
   }
 }
 const v = new Vehicle(2);
-console.log(v.wheels); // TS2445: protected — not accessible outside.`,
+console.log(v.wheels); // TS2445: protected — not accessible outside.
+
+export {};`,
         consoleOutput: `[diagnostic] TS2445: Property 'wheels' is protected and only accessible within class 'Vehicle' and its subclasses.`,
       },
       {
@@ -757,7 +845,9 @@ via a per-instance private slot.`,
     this.pin = pin;
     this.#token = token;
   }
-}`,
+}
+
+export {};`,
         consoleOutput: `// Emitted JS exposes "pin" as a normal field; "#token" is kept private.`,
       },
       {
@@ -765,15 +855,25 @@ via a per-instance private slot.`,
         title: 'super() before this',
         explanation: `In a derived class constructor, \`this\` does not exist until **after**
 \`super()\` returns. Accessing \`this\` before \`super()\` throws at runtime.
-TypeScript enforces this statically.`,
-        code: `class Car extends Vehicle {
+TypeScript enforces this statically. (The base \`Vehicle\` is declared in the same
+snippet so the example is self-contained.)`,
+        code: `class Vehicle {
+  protected wheels: number;
+  constructor(wheels: number) {
+    this.wheels = wheels;
+  }
+}
+
+class Car extends Vehicle {
   public model: string;
   constructor(model: string) {
     // this.model = model; // HERE => runtime ReferenceError
     super(4);
     this.model = model;
   }
-}`,
+}
+
+export {};`,
         consoleOutput: `// Correct order: super() first, then assign instance fields.`,
       },
       {
@@ -794,7 +894,9 @@ cannot replace it with a writable field unless the base declares it overridable
   describe(this: Vehicle): string {
     return \`vehicle with \${this.wheels} wheels\`;
   }
-}`,
+}
+
+export {};`,
         consoleOutput: `// wheelCount is read-only from the outside (no setter).`,
       },
     ],
