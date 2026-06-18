@@ -1,5 +1,5 @@
 // ============================================================
-// 01 — KICKSTART & SETUP
+// 01 — START & SETUP
 // File: tools-demo.ts
 // Theme: String vs string, basic types, ts-node/tsx runtime
 // ============================================================

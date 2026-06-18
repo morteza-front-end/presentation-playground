@@ -102,11 +102,11 @@ function scrollTo(id: string) {
 
 function onScroll() {
   if (!contentEl.value) return;
-  const top = contentEl.value.scrollTop;
+  const containerTop = contentEl.value.getBoundingClientRect().top;
   let current = sections[0]!.id;
   for (const s of sections) {
     const el = sectionRefs.get(s.id);
-    if (el && el.offsetTop - 80 <= top) current = s.id;
+    if (el && el.getBoundingClientRect().top - containerTop - 80 <= 0) current = s.id;
   }
   activeId.value = current;
 }
